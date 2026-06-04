@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="42%" r="62%">
+      <stop offset="0%" stop-color="#836EF9" stop-opacity="0.22"/>
+      <stop offset="55%" stop-color="#2a2350" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#0a0a0a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="gem" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#bcd9ff"/>
+      <stop offset="100%" stop-color="#2f7be0"/>
+    </linearGradient>
+    <filter id="g" x="-120%" y="-120%" width="340%" height="340%">
+      <feGaussianBlur stdDeviation="30"/>
+    </filter>
+    <style>
+      .label{font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;fill:#e9e9e9;font-size:30px;font-weight:600;letter-spacing:.5px}
+      .plus{font-family:ui-monospace,Menlo,monospace;fill:#fff;font-size:58px;font-weight:700}
+      .tag{font-family:ui-monospace,Menlo,monospace;fill:#8b8b8b;font-size:22px;letter-spacing:.4px}
+    </style>
+  </defs>
+
+  <rect width="1200" height="630" fill="#0a0a0a"/>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <circle cx="300" cy="250" r="78" fill="#4f9bff" opacity="0.42" filter="url(#g)"/>
+  <circle cx="600" cy="250" r="78" fill="#ffb454" opacity="0.32" filter="url(#g)"/>
+  <circle cx="900" cy="250" r="78" fill="#836EF9" opacity="0.48" filter="url(#g)"/>
+
+  <rect x="235" y="185" width="130" height="130" rx="30" fill="#141414" stroke="#fff" stroke-opacity="0.10"/>
+  <rect x="535" y="185" width="130" height="130" rx="30" fill="#141414" stroke="#fff" stroke-opacity="0.10"/>
+  <rect x="835" y="185" width="130" height="130" rx="30" fill="#141414" stroke="#fff" stroke-opacity="0.10"/>
+
+  <polygon points="274,230 326,230 348,252 300,298 252,252" fill="url(#gem)"/>
+  <g stroke="#0a1830" stroke-opacity="0.35" stroke-width="2" fill="none">
+    <line x1="252" y1="252" x2="348" y2="252"/>
+    <line x1="274" y1="230" x2="300" y2="298"/>
+    <line x1="326" y1="230" x2="300" y2="298"/>
+  </g>
+
+  <g fill="#f2f2f2" transform="translate(8,0)">
+    <rect x="560" y="232" width="84" height="15" rx="2"/>
+    <polygon points="560,234 538,241 560,246"/>
+    <path d="M582,247 L622,247 L617,271 L646,271 L646,285 L554,285 L554,271 L583,271 Z"/>
+  </g>
+
+  <g fill="#fff">
+    <rect x="870" y="214" width="11" height="72" rx="5"/>
+    <rect x="886" y="214" width="11" height="72" rx="5"/>
+    <rect x="902" y="214" width="11" height="72" rx="5"/>
+    <rect x="918" y="214" width="11" height="72" rx="5"/>
+  </g>
+
+  <text x="450" y="270" text-anchor="middle" class="plus">+</text>
+  <text x="750" y="270" text-anchor="middle" class="plus">+</text>
+
+  <text x="300" y="360" text-anchor="middle" class="label">Gemma 4 12B</text>
+  <text x="600" y="360" text-anchor="middle" class="label">Foundry</text>
+  <text x="900" y="360" text-anchor="middle" class="label">Monad</text>
+
+  <text x="600" y="575" text-anchor="middle" class="tag">live on monad testnet &#183; every click is a transaction</text>
+</svg>
