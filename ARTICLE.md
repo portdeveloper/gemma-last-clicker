@@ -17,15 +17,15 @@ keywords:
   - dapp
   - foundry
 cover:
-  src: "assets/articles/i-asked-gemma-4-12b-to-create-a-dapp/cover.svg"
-  alt: "A free local model building a dapp on Monad"
-  og_alt: "free local model wrote my dapp"
+  src: "assets/articles/i-asked-gemma-4-12b-to-create-a-dapp/cover.png"
+  alt: "Gemma 4 12B"
+  og_alt: "Gemma 4 12B"
 originally_published:
   platform: X
   url: "https://x.com/port_dev"
 ---
 
-![A free local model building a dapp on Monad](assets/articles/i-asked-gemma-4-12b-to-create-a-dapp/cover.svg "the whole thing was written by a 12B running on a laptop")
+![Gemma 4 12B](assets/articles/i-asked-gemma-4-12b-to-create-a-dapp/cover.png "the whole thing was written by a 12B running on a laptop")
 
 A free model that fits on a laptop wrote my entire dapp, contract and frontend, and then couldn't find a single one of its own bugs.
 
