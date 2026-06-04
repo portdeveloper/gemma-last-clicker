@@ -1,0 +1,8 @@
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+*.gguf
+.gemma-web3-deployer*
+.DS_Store
+node_modules/
+.vercel/

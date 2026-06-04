@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Last Clicker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&display=swap');
+    body { font-family: 'Space Grotesk', sans-serif; background:#0a0a0a; color:#fff; }
+    .glass { background: rgba(255,255,255,0.05); backdrop-filter: blur(10px); border:1px solid rgba(255,255,255,0.1); }
+    .mon-gradient { background: linear-gradient(90deg,#836EF9 0%,#a890ff 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-4">
+  <div class="max-w-md w-full glass p-8 rounded-3xl shadow-2xl text-center">
+    <h1 class="text-4xl font-bold mb-2">Last <span class="mon-gradient">Clicker</span></h1>
+    <p class="text-gray-400 mb-8 text-sm">Last click before the timer ends wins the pot. Every click is a transaction.</p>
+    <div class="mb-6">
+      <p class="text-gray-400 text-xs uppercase tracking-widest">Current Pot</p>
+      <h2 id="pot" class="text-5xl font-bold mt-2">…</h2>
+    </div>
+    <div class="mb-8">
+      <p class="text-gray-400 text-xs uppercase tracking-widest">Time Remaining</p>
+      <div id="timer" class="text-3xl font-mono mt-2 text-yellow-400">--</div>
+    </div>
+    <div class="mb-8">
+      <p class="text-gray-400 text-xs uppercase tracking-widest">Last Clicker</p>
+      <p id="last" class="text-xs break-all text-gray-500 mt-1 italic">—</p>
+    </div>
+    <div class="flex flex-col gap-4">
+      <button id="connectBtn" class="bg-blue-600 hover:bg-blue-700 px-8 py-3 rounded-full font-bold transition-all">Connect Wallet</button>
+      <button id="clickBtn" class="hidden bg-white text-black hover:bg-gray-200 py-4 rounded-xl font-bold text-xl active:scale-95 transition-transform">CLICK!</button>
+      <button id="claimBtn" class="hidden border border-gray-600 hover:bg-gray-800 py-3 rounded-xl font-medium transition-all">Claim Pot</button>
+    </div>
+    <p id="status" class="mt-6 text-sm text-blue-400 italic break-all"></p>
+  </div>
+  <script type="module">
+    // Gemma wrote the UI above. Its viem integration was hallucinated (fake imports
+    // publicAddress/solidityAbiInterpreter, malformed chain, contract.writeMethods.click.encoded,
+    // wallet_switchChain). This script is the human rewrite using real viem v2 APIs.
+    import { createPublicClient, createWalletClient, http, custom, defineChain, formatEther } from 'https://esm.sh/viem@2';
+
+    const CONTRACT = '0x0507d7290992B475ED3FC83AF9d54aa8A29D4005';
+    const monadTestnet = defineChain({
+      id: 10143, name: 'Monad Testnet',
+      nativeCurrency: { name: 'MON', symbol: 'MON', decimals: 18 },
+      rpcUrls: { default: { http: ['https://testnet-rpc.monad.xyz'] } },
+    });
+    const ABI = [
+      { name:'CLICK_FEE', type:'function', stateMutability:'view', inputs:[], outputs:[{type:'uint256'}] },
+      { name:'pot', type:'function', stateMutability:'view', inputs:[], outputs:[{type:'uint256'}] },
+      { name:'getRemainingTime', type:'function', stateMutability:'view', inputs:[], outputs:[{type:'uint256'}] },
+      { name:'lastClickListener', type:'function', stateMutability:'view', inputs:[], outputs:[{type:'address'}] },
+      { name:'click', type:'function', stateMutability:'payable', inputs:[], outputs:[] },
+      { name:'claim', type:'function', stateMutability:'nonpayable', inputs:[], outputs:[] },
+    ];
+
+    const publicClient = createPublicClient({ chain: monadTestnet, transport: http() });
+    let walletClient, account;
+    const $ = (id) => document.getElementById(id);
+    const status = (m) => { $('status').innerText = m; };
+
+    async function refresh() {
+      try {
+        const [pot, remaining, last] = await Promise.all([
+          publicClient.readContract({ address: CONTRACT, abi: ABI, functionName: 'pot' }),
+          publicClient.readContract({ address: CONTRACT, abi: ABI, functionName: 'getRemainingTime' }),
+          publicClient.readContract({ address: CONTRACT, abi: ABI, functionName: 'lastClickListener' }),
+        ]);
+        $('pot').innerText = `${formatEther(pot)} MON`;
+        const s = Number(remaining);
+        $('timer').innerText = s > 0 ? `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}` : 'ENDED';
+        $('last').innerText = (last && last !== '0x0000000000000000000000000000000000000000') ? last : '—';
+      } catch (e) { console.error(e); }
+    }
+
+    async function connect() {
+      if (!window.ethereum) { alert('Install a wallet (MetaMask, Rabby, …)'); return; }
+      account = (await window.ethereum.request({ method: 'eth_requestAccounts' }))[0];
+      try {
+        await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x279f' }] });
+      } catch (e) {
+        if (e.code === 4902) {
+          await window.ethereum.request({ method: 'wallet_addEthereumChain', params: [{
+            chainId: '0x279f', chainName: 'Monad Testnet',
+            nativeCurrency: { name: 'MON', symbol: 'MON', decimals: 18 },
+            rpcUrls: ['https://testnet-rpc.monad.xyz'],
+          }]});
+        }
+      }
+      walletClient = createWalletClient({ chain: monadTestnet, account, transport: custom(window.ethereum) });
+      $('connectBtn').classList.add('hidden');
+      $('clickBtn').classList.remove('hidden');
+      $('claimBtn').classList.remove('hidden');
+      status(`connected ${account.slice(0,6)}…${account.slice(-4)}`);
+    }
+
+    async function click() {
+      try {
+        status('sending click…');
+        const fee = await publicClient.readContract({ address: CONTRACT, abi: ABI, functionName: 'CLICK_FEE' });
+        const hash = await walletClient.writeContract({ address: CONTRACT, abi: ABI, functionName: 'click', value: fee, account });
+        status(`click sent: ${hash.slice(0,10)}…`);
+        await publicClient.waitForTransactionReceipt({ hash });
+        status('click confirmed'); refresh();
+      } catch (e) { status('click failed: ' + (e.shortMessage || e.message)); }
+    }
+
+    async function claim() {
+      try {
+        status('claiming…');
+        const hash = await walletClient.writeContract({ address: CONTRACT, abi: ABI, functionName: 'claim', account });
+        status(`claim sent: ${hash.slice(0,10)}…`);
+        await publicClient.waitForTransactionReceipt({ hash });
+        status('claim confirmed'); refresh();
+      } catch (e) { status('claim failed: ' + (e.shortMessage || e.message)); }
+    }
+
+    $('connectBtn').onclick = connect;
+    $('clickBtn').onclick = click;
+    $('claimBtn').onclick = claim;
+    refresh();
+    setInterval(refresh, 1000);
+  </script>
+</body>
+</html>

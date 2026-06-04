@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Last Clicker DApp</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&display=swap');
+        body {
+            font-family: 'Space+Grotesk', sans-serif;
+            background: #0a0a0a;
+            color: #ffffff;
+        }
+        .glass {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .mon-gradient {
+            background: linear-gradient(90deg, #00f2ff 0%, #0062ff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-4">
+
+    <div class="max-w-md w-full glass p-8 rounded-3xl shadow-2xl text-center">
+        <h1 class="text-4xl font-bold mb-2">Last <span class="mon-gradient">Clicker</span></h1>
+        <p class="text-gray-400 mb-8 text-sm">The last person to click wins the pot.</p>
+
+        <div id="connect-section">
+            <button id="connectBtn" class="bg-blue-600 hover:bg-blue-700 px-8 py-3 rounded-full font-bold transition-all">
+                Connect Wallet
+            </button>
+        </div>
+
+        <div id="game-section" class="hidden">
+            <div class="mb-6">
+                <p class="text-gray-400 text-xs uppercase tracking-widest">Current Pot</p>
+                <h2 id="potAmount" class="text-5xl font-bold mt-2">0.00 MON</h2>
+            </div>
+
+            <div class="mb-8">
+                <p class="text-gray-400 text-xs uppercase tracking-widest">Time Remaining</p>
+                <div id="timer" class="text-3xl font-mono mt-2 text-yellow-400">00:00:00</div>
+            </div>
+
+            <div class="mb-8">
+                <p class="text-gray-400 text-xs uppercase tracking-widest">Last Clicker</p>
+                <p id="lastClickListener" class="text-xs break-all text-gray-500 mt-1 italic">...</p>
+            </div>
+
+            <div class="flex flex-col gap-4">
+                <button id="clickBtn" class="bg-white text-black hover:bg-gray-200 py-4 rounded-xl font-bold text-xl active:scale-95 transition-transform">
+                    CLICK!
+                </button>
+                <button id="claimBtn" class="border border-gray-600 hover:bg-gray-800 py-3 rounded-xl font-medium transition-all">
+                    Claim Prize
+                </button>
+            </div>
+
+            <p id="status" class="mt-6 text-sm text-blue-400 italic"></p>
+        </div>
+    </div>
+
+    <script type="module">
+        import { 
+            createPublicClient, 
+            createWalletClient, 
+            parseEther, 
+            publicAddress, 
+            solidityAbiInterpreter,
+            formatEther 
+        } from 'https://esm.sh/viem';
+        import { mainnet } from 'https://esm.sh/viem/chains';
+
+        // Configuration
+        const MONAD_CHAIN = {
+            id: 10143,
+            name: 'Monad Testnet',
+            nativeCurrency: { name: 'Monad', symbol: 'MON', decimals: 18 },
+            rpcUrls: {
+                default: { transport: 'https://testnet-rpc.monad.xyz' },
+            },
+            blockExplorers: {
+                default: { name: 'Monad Explorer', url: 'https://explorer.monad.xyz' },
+            },
+        };
+
+        const CONTRACT_ADDRESS = '0x0507d7290992B475ED3FC83AF9d54aa8A29D4005'; // <--- CHANGE THIS
+        const ABI = [
+            { "name": "CLICK_FEE", "type": "function", "stateMutability": "view", "inputs": [], "outputs": [{ "type": "uint256" }] },
+            { "name": "pot", "type": "function", "stateMutability": "view", "inputs": [], "outputs": [{ "type": "uint256" }] },
+            { "name": "gameEndTime", "type": "function", "stateMutability": "view", "inputs": [], "outputs": [{ "type": "uint256" }] },
+            { "name": "getRemainingTime", "type": "function", "stateMutability": "view", "inputs": [], "outputs": [{ "type": "uint256" }] },
+            { "name": "lastClickListener", "type": "function", "stateMutability": "view", "inputs": [], "outputs": [{ "type": "address" }] },
+            { "name": "gameActive", "type": "function", "stateMutability": "view", "inputs": [], "outputs": [{ "type": "bool" }] },
+            { "name": "click", "type": "function", "stateMutability": "payable", "inputs": [], "outputs": [] },
+            { "name": "claim", "type": "function", "stateMutability": "nonpayable", "inputs": [], "outputs": [] }
+        ];
+
+        let publicClient;
+        let walletClient;
+        let contract;
+        let pollInterval;
+
+        // UI Elements
+        const connectBtn = document.getElementById('connectBtn');
+        const gameSection = document.getElementById('game-section');
+        const connectSection = document.getElementById('connect-section');
+        const potEl = document.getElementById('potAmount');
+        const timerEl = document.getElementById('timer');
+        const lastClickEl = document.getElementById('lastClickListener');
+        const statusEl = document.getElementById('status');
+        const clickBtn = document.getElementById('clickBtn');
+        const claimBtn = document.getElementById('claimBtn');
+
+        async function init() {
+            publicClient = createPublicClient({
+                chain: MONAD_CHAIN,
+                transport: async (req) => {
+                    // Standard fetch for RPC
+                    const response = await fetch(MONAD_CHAIN.rpcUrls.default.transport, {
+                        method: 'POST',
+                        body: JSON.stringify(req)
+                    });
+                    return response.json();
+                }
+            });
+
+            // Note: Because we are using a custom RPC URL with fetch, 
+            // viem's standard transport might need adjustment or 
+            // we can just use the standard transport if it's a standard JSON-RPC.
+            // Let's simplify and use the default transport for the custom chain:
+            publicClient = createPublicClient({
+                chain: MONAD_CHAIN,
+            });
+        }
+
+        async function connectWallet() {
+            if (!window.ethereum) {
+                alert("Please install a Web3 wallet (MetaMask, Rabby, etc.)");
+                return;
+            }
+
+            try {
+                // Request account access
+                const accounts = await window.ethereum.request({
+                    method: 'eth_requestAccounts',
+                });
+
+                // Request chain switch
+                try {
+                    await window.ethereum.request({
+                        method: 'wallet_switchChain',
+                        params: [{ chainId: MONAD_CHAIN.id }],
+                    });
+                } catch (e) {
+                    alert("Please switch to Monad Testnet (Chain ID: 10143)");
+                }
+
+                const account = accounts[0];
+                walletClient = createWalletClient({
+                    chain: MONAD_CHAIN,
+                    account,
+                });
+
+                connectBtn.classList.add('hidden');
+                connectSection.classList.add('hidden');
+                gameSection.classList.remove('hidden');
+
+                contract = publicClient.getContract({
+                    address: CONTRACT_ADDRESS,
+                    abi: ABI,
+                });
+
+                updateUI();
+                startPolling();
+            } catch (err) {
+                console.error(err);
+                statusEl.innerText = "Error connecting: " + err.message;
+            }
+        }
+
+        async function updateUI() {
+            try {
+                const pot = await contract.read.pot();
+                const lastClicker = await contract.read.lastClickListener();
+                
+                potEl.innerText = `${formatEther(pot)} MON`;
+                lastClickEl.innerText = lastClicker;
+                
+                statusEl.innerText = "";
+            } catch (err) {
+                console.error("UI Update Error:", err);
+            }
+        }
+
+        function startPolling() {
+            if (pollInterval) clearInterval(pollInterval);
+            pollInterval = setInterval(async () => {
+                try {
+                    const remaining = await contract.read.getRemainingTime();
+                    const seconds = Number(remaining);
+                    
+                    const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
+                    const m = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0');
+                    const s = (seconds % 60).toString().padStart(2, '0');
+                    
+                    timerEl.innerText = `${h}:${m}:${s}`;
+                    
+                    // Update pot and last clicker every 5 seconds to save RPC calls
+                    if (Math.floor(Date.now() / 5000) % 2 === 0) {
+                        updateUI();
+                    }
+                } catch (err) {
+                    console.error("Polling Error:", err);
+                }
+            }, 1000);
+        }
+
+        clickBtn.onclick = async () => {
+            try {
+                statusEl.innerText = "Processing click...";
+                const fee = await contract.read.CLICK_FEE();
+                
+                const hash = await walletClient.sendTransaction({
+                    to: CONTRACT_ADDRESS,
+                    value: fee,
+                    data: contract.writeMethods.click.encoded,
+                });
+
+                statusEl.innerText = "Click sent! Hash: " + hash;
+                setTimeout(updateUI, 2000);
+            } catch (err) {
+                console.error(err);
+                statusEl.innerText = "Click failed: " + (err.message?.split('\n')[0] || err.message);
+            }
+        };
+
+        claimBtn.onclick = async () => {
+            try {
+                statusEl.innerText = "Claiming...";
+                const hash = await walletClient.sendTransaction({
+                    to: CONTRACT_ADDRESS,
+                    data: contract.writeMethods.claim.encoded,
+                });
+                statusEl.innerText = "Claim sent! Hash: " + hash;
+                setTimeout(updateUI, 2000);
+            } catch (err) {
+                console.error(err);
+                statusEl.innerText = "Claim failed: " + (err.message?.split('\n')[0] || err.message);
+            }
+        };
+
+        connectBtn.onclick = connectWallet;
+        
+        // Initialize the client
+        init().then(() => {
+            console.log("Client initialized");
+        });
+
+    </script>
+</body>
+</html>
