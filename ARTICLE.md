@@ -39,7 +39,7 @@ I gave it one prompt:
 
 > Build a "last clicker" game in Solidity with Foundry: a pot funded by a small fee per click, a short countdown that resets on each click, and whoever clicked last when the timer ends can claim the pot. Give me the contract.
 
-The game logic came back right on the first try, and the security surprised me. Its `claim()` clears the balance before it sends any money out:
+The game logic came back right on the first try, and so did the security. Its `claim()` clears the balance before it sends any money out:
 
 ```solidity
 function claim() external {
@@ -84,7 +84,7 @@ And the test set itself up with a deploy helper that doesn't exist in Foundry:
 game = LastClicker(deploy(LastClicker.sol));
 ```
 
-None of it compiles, and the interesting part is what happened next. I pasted back only the first error, the Hardhat import, and it rewrote the whole file and fixed every compile error in a single pass, including the ones I never pointed at. For boilerplate it can't quite remember, it's a fast way back to green.
+None of it compiles, so I pasted back just the first error, the Hardhat import, and it rewrote the whole file in one pass, fixing every compile error, including the ones I hadn't pointed at. For boilerplate it can't quite remember, that's a fast way back to green.
 
 ## Then it couldn't debug its own tests
 
@@ -123,7 +123,7 @@ const hash = await walletClient.sendTransaction({
 });
 ```
 
-It built the chain config with the wrong shape and called `wallet_switchChain`, which isn't a real wallet method (the real one is `wallet_switchEthereumChain`). This is the failure that matters most for fullstack work: on a library it has seen less of, it knows the silhouette of the right code and fills the specifics with confident fiction. I rewrote the wiring myself. The interface was its work, the plumbing was mine.
+It built the chain config with the wrong shape and called `wallet_switchChain`, which isn't a real wallet method (the real one is `wallet_switchEthereumChain`). On a library it has seen less of, it knows the silhouette of the right code and fills the specifics with confident fiction, and the glue between a contract and a UI is almost all specifics. I rewrote the wiring myself. The interface was its work, the plumbing was mine.
 
 ## The reveal: it was Monad, and it took one line
 
