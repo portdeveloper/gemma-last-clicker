@@ -39,7 +39,7 @@ The game is last-clicker. You pay a tiny fee to click, and each click resets a s
 
 ## What it got right
 
-The game logic was right on the first try. More surprising was the security. Its payout zeroes the pot before sending the money and uses `.transfer()`, the ordering that stops a reentrancy attack, where the recipient calls back in and drains the contract before the balance updates. That is the bug behind the 2016 DAO hack, and I assumed a 12B would reach for the naive version, but it wrote the safe one.
+The game logic was right on the first try. The security surprised me more. Its payout zeroes the pot before sending the money and uses `.transfer()`, the ordering that stops a reentrancy attack, where the recipient calls back in and drains the contract before the balance updates. That is the bug behind the 2016 DAO hack, and I assumed a 12B would reach for the naive version, but it wrote the safe one.
 
 ## Where it broke
 
@@ -47,7 +47,7 @@ The first version didn't compile, and the reasons were a tour of how a model fak
 
 Then it got stuck and stayed there. The tests compiled, but every one reverted on the first click, because the test never gave the player accounts any ether to spend. I handed it the failure. It tried `vm.warp`, then `vm.roll`, convinced the problem was timing, and three rounds later the tests were failing the same way, down to the gas. The revert was sitting in its own output and it could not see the cause.
 
-So I diagnosed it. I told it the accounts were unfunded and to use `vm.deal`, and that got one of three tests green. It still missed the other two, a timer check that never moved the clock forward and a pair of precompile addresses that can't receive ether, and each passed only once I named the exact cause. Every line of the passing tests is the model's; every diagnosis was mine. **It can apply a fix you hand it, but it can't find one on its own.**
+So I diagnosed it. I told it the accounts were unfunded and to use `vm.deal`, and that got one of three tests green. It still missed the other two, a timer check that never moved the clock forward and a pair of precompile addresses that can't receive ether, and each passed only once I named the exact cause. **It can apply a fix you hand it, but it can't find one on its own.**
 
 The frontend went the same way. I asked for a single page with viem and got a genuinely sharp-looking UI. The web3 layer beneath it was invented, imports that aren't in viem and methods that don't exist on objects it made up. It knows what working code should look like and fills the specifics in with fiction, so I rewrote the wiring myself. The interface was its work, the plumbing was mine.
 
@@ -67,6 +67,6 @@ One honest caveat: forge's linter flagged the timer for leaning on `block.timest
 
 It's live on Monad testnet at https://gemma-last-clicker.vercel.app. You'll need a wallet and a little testnet MON. Every click is a real transaction that confirms in about a second and costs a fraction of a cent, which is the only reason a game made of last-second clicks can live entirely on-chain.
 
-So, can a free model on your laptop build a real dapp? Closer than I expected, and not by itself. It produced a safe contract and a clean interface, and it couldn't find one of its own bugs even with a sharper model feeding it the errors. It's a fast junior that can't read a stack trace yet. Good for learning and for things you'll throw away. For anything you would actually deploy, it needs someone sitting next to it.
+So, can a free model on your laptop build a real dapp? Closer than I expected. It produced a safe contract and a clean interface, and it couldn't find one of its own bugs even with a sharper model feeding it the errors. It's a fast junior that can't read a stack trace yet. Good for learning and for things you'll throw away. For anything you would actually deploy, it needs someone sitting next to it.
 
 The repo has the code and every prompt I used: https://github.com/portdeveloper/gemma-last-clicker. The file that finally got it deploying to Monad cleanly is `MONAD_CONTEXT.md` in there. Go build something.
