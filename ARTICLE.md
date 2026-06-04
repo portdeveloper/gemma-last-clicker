@@ -103,6 +103,8 @@ So I stopped asking it to fix the tests and told it the cause instead:
 
 It added `vm.deal`, and one of the three passed. The other two had their own bugs: a timer check that never advanced the clock, and player addresses set to `address(1)` and `address(2)`, which are precompiles and can't receive ether. Each passed only after I named the exact cause. **It can apply a fix you hand it, but it can't find one on its own.**
 
+![forge test output, three rounds failing then passing](assets/articles/i-asked-gemma-4-12b-to-create-a-dapp/tests.png "three rounds red, then green the moment I named the cause")
+
 ## The frontend looked finished and was hollow
 
 I asked for a single-page frontend with viem. The layout it returned was genuinely good, a clean dark card with a live countdown. The web3 layer under it was invented from scratch, starting with the imports:
@@ -137,7 +139,11 @@ Foundry read the chain id off the endpoint on its own, and the deploy went throu
 
 One honest caveat: forge's linter flagged the timer for leaning on `block.timestamp`, which validators can nudge. That matters more on a one-second chain than a twelve-second one, and you would tighten it before mainnet.
 
-The result is live at https://gemma-last-clicker.vercel.app. Connect a wallet with a little testnet MON and click. Every click is a real transaction that confirms in about a second and costs a fraction of a cent, which is the only reason a game made of last-second clicks can live entirely on-chain.
+The result is live at https://gemma-last-clicker.vercel.app. Connect a wallet with a little testnet MON and click.
+
+![the last-clicker game running on Monad testnet](assets/articles/i-asked-gemma-4-12b-to-create-a-dapp/live-game.png "the game, live on monad testnet")
+
+Every click is a real transaction that confirms in about a second and costs a fraction of a cent, which is the only reason a game made of last-second clicks can live entirely on-chain.
 
 ## So how usable is it?
 
@@ -145,4 +151,8 @@ Treat a free local model as a fast junior. It is genuinely good at the parts it 
 
 So a 12B gets you a working first draft of a contract and a good-looking shell of a frontend, and then you do the debugging and the integration by hand. For learning and for things you'll throw away, that's plenty. For anything you would deploy and walk away from, it needs someone next to it who can read the errors it can't.
 
-The repo has the code and every prompt I used: https://github.com/portdeveloper/gemma-last-clicker. The file that finally got it deploying to Monad cleanly is `MONAD_CONTEXT.md` in there. Go build something.
+The repo has the code and every prompt I used: https://github.com/portdeveloper/gemma-last-clicker. The file that finally got it deploying to Monad cleanly is `MONAD_CONTEXT.md` in there.
+
+![wizard meme](assets/articles/i-asked-gemma-4-12b-to-create-a-dapp/wizard-meme.gif "go do some magic")
+
+Questions?
