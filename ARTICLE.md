@@ -1,6 +1,6 @@
 ---
 title: "I asked Gemma 4 12B to create a dapp. Make no mistakes."
-description: "I had a free local Gemma 4 12B build a dapp on Monad. It wrote every line and dodged the famous reentrancy bug, then couldn't fix a single one of its own bugs without me diagnosing each one."
+description: "I had a free local Gemma 4 12B build a dapp on Monad, and kept every prompt. It wrote a safe contract, hallucinated a whole frontend, and found zero of its own bugs. Here's how usable a 12B actually is for fullstack work."
 slug: "i-asked-gemma-4-12b-to-create-a-dapp"
 published_at: "2026-06-05T12:00:00Z"
 modified_at: "2026-06-05T12:00:00Z"
@@ -29,27 +29,101 @@ originally_published:
 
 A free model that fits on a laptop wrote my entire dapp, contract and frontend, and then couldn't find a single one of its own bugs.
 
-I work at Monad, and I had a question in mind: can a free, open model you run on your own machine actually build something real for an EVM chain? So I set it up as a test. A local Gemma 4 12B wrote the code, and Claude operated it, sending the prompts and pasting back whatever the compiler complained about. I gave it a game to build.
+I work at Monad, and I had a question in mind: can a free, open model you run on your own machine actually build something real for an EVM chain? So I set it up as a test. A local Gemma 4 12B wrote the code, and Claude operated it, sending the prompts and pasting back whatever the compiler said. I kept every prompt and every broken file, so you can see for yourself where a 12B helps and where it falls over.
 
-## The setup
+The model is the new Gemma 4 12B, out June 3rd under an Apache 2.0 license, so you can do what you like with it. It fits in about 16GB, so I ran it on my own machine with llama.cpp, no API key and nothing leaving the laptop. It managed 20 to 40 tokens a second. The thing I had it build is a game called last-clicker. You pay a tiny fee to click, and each click resets a short countdown. Whoever clicked last when the timer runs out takes the pot. I built it against Anvil, Foundry's local node.
 
-Gemma 4 12B shipped on June 3rd, and the license is now Apache 2.0, so you can do what you like with it. It fits in about 16GB, which meant I could run it on my own machine with llama.cpp, no API key and nothing leaving the laptop. It managed 20 to 40 tokens a second.
+## The first draft was good code that didn't compile
 
-The game is last-clicker. You pay a tiny fee to click, and each click resets a short countdown. Whoever clicked last when the timer runs out takes the pot. I built it against Anvil, Foundry's local node.
+I gave it one prompt:
 
-## What it got right
+> Build a "last clicker" game in Solidity with Foundry: a pot funded by a small fee per click, a short countdown that resets on each click, and whoever clicked last when the timer ends can claim the pot. Give me the contract.
 
-The game logic was right on the first try. The security surprised me more. Its payout zeroes the pot before sending the money and uses `.transfer()`, the ordering that stops a reentrancy attack, where the recipient calls back in and drains the contract before the balance updates. That is the bug behind the 2016 DAO hack, and I assumed a 12B would reach for the naive version, but it wrote the safe one.
+The game logic came back right on the first try, and the security surprised me. Its `claim()` clears the balance before it sends any money out:
 
-## Where it broke
+```solidity
+function claim() external {
+    require(block.timestamp >= gameEndTime, "Timer has not expired yet");
+    require(msg.sender == lastClickListener, "You were not the last clicker");
+    require(pot > 0, "Pot is empty");
 
-The first version didn't compile, and the reasons were a tour of how a model fakes fluency. The one that made me laugh: it imported Hardhat into a Foundry project. A couple more were in the same spirit, a constructor declared twice among them. I pasted back only the first error, and it cleared the whole set in one round, which I hadn't expected.
+    uint256 amount = pot;
+    pot = 0;                              // state cleared first
+    gameActive = false;
+    lastClickListener = address(0);
 
-Then it got stuck and stayed there. The tests compiled, but every one reverted on the first click, because the test never gave the player accounts any ether to spend. I handed it the failure. It tried `vm.warp`, then `vm.roll`, convinced the problem was timing, and three rounds later the tests were failing the same way, down to the gas. The revert was sitting in its own output and it could not see the cause.
+    payable(msg.sender).transfer(amount); // then the transfer
+}
+```
 
-So I diagnosed it. I told it the accounts were unfunded and to use `vm.deal`, and that got one of three tests green. It still missed the other two, a timer check that never moved the clock forward and a pair of precompile addresses that can't receive ether, and each passed only once I named the exact cause. **It can apply a fix you hand it, but it can't find one on its own.**
+That ordering, state first and the external call last, is what stops a reentrancy attack, where the recipient calls back into `claim()` and drains the contract before the balance updates. It is the bug behind the 2016 DAO hack, and I assumed a 12B would reach for the naive version, but it wrote the safe one.
 
-The frontend went the same way. I asked for a single page with viem and got a genuinely sharp-looking UI. The web3 layer beneath it was invented, imports that aren't in viem and methods that don't exist on objects it made up. It knows what working code should look like and fills the specifics in with fiction, so I rewrote the wiring myself. The interface was its work, the plumbing was mine.
+What it could not do was hand me a project that compiled. The test file opened with this:
+
+```solidity
+import "hardhat"; // If using standard, but for Foundry we use:
+import "../src/LastClicker.sol";
+```
+
+That is a Hardhat import in a Foundry project, with a half-finished comment where the model started to correct itself and gave up. The contract declared its constructor twice:
+
+```solidity
+constructor() {
+    gameActive = true;
+    gameEndTime = block.timestamp + COUNTDOWN_DURATION;
+}
+// ...further down, in the same contract...
+constructor() {
+    owner = msg.sender;
+}
+```
+
+And the test set itself up with a deploy helper that doesn't exist in Foundry:
+
+```solidity
+game = LastClicker(deploy(LastClicker.sol));
+```
+
+None of it compiles, and the interesting part is what happened next. I pasted back only the first error, the Hardhat import, and it rewrote the whole file and fixed every compile error in a single pass, including the ones I never pointed at. For boilerplate it can't quite remember, it's a fast way back to green.
+
+## Then it couldn't debug its own tests
+
+The code compiled, so I ran the tests. All three reverted on the first line that moved money:
+
+```solidity
+vm.prank(player1);
+game.click{value: 0.001 ether}();   // reverts: player1 holds no ether
+```
+
+The test never funded the accounts. In Foundry you give a test address a balance with `vm.deal`, and that one line fixes all three. I handed it the failure. It added `vm.warp`, then on the next round `vm.roll`, convinced the problem was timing. Three rounds in, the tests were failing exactly as before, down to the gas, and it was still editing the clock while the real cause sat untouched in its own output.
+
+So I stopped asking it to fix the tests and told it the cause instead:
+
+> The tests revert on the first `click{value:}` because the player accounts have a zero balance. In Foundry you fund an address with `vm.deal`. Fix the test.
+
+It added `vm.deal`, and one of the three passed. The other two had their own bugs: a timer check that never advanced the clock, and player addresses set to `address(1)` and `address(2)`, which are precompiles and can't receive ether. Each passed only after I named the exact cause. **It can apply a fix you hand it, but it can't find one on its own.**
+
+## The frontend looked finished and was hollow
+
+I asked for a single-page frontend with viem. The layout it returned was genuinely good, a clean dark card with a live countdown. The web3 layer under it was invented from scratch, starting with the imports:
+
+```js
+import {
+  createPublicClient, createWalletClient, parseEther,
+  publicAddress, solidityAbiInterpreter, formatEther
+} from 'https://esm.sh/viem';
+```
+
+`publicAddress` and `solidityAbiInterpreter` are not part of viem. They sound like they should be, which is the whole problem. It then sent transactions through a method it invented:
+
+```js
+const hash = await walletClient.sendTransaction({
+  to: CONTRACT_ADDRESS,
+  data: contract.writeMethods.click.encoded,   // not a real thing
+});
+```
+
+It built the chain config with the wrong shape and called `wallet_switchChain`, which isn't a real wallet method (the real one is `wallet_switchEthereumChain`). This is the failure that matters most for fullstack work: on a library it has seen less of, it knows the silhouette of the right code and fills the specifics with confident fiction. I rewrote the wiring myself. The interface was its work, the plumbing was mine.
 
 ## The reveal: it was Monad, and it took one line
 
@@ -63,10 +137,12 @@ Foundry read the chain id off the endpoint on its own, and the deploy went throu
 
 One honest caveat: forge's linter flagged the timer for leaning on `block.timestamp`, which validators can nudge. That matters more on a one-second chain than a twelve-second one, and you would tighten it before mainnet.
 
-## Play it
+The result is live at https://gemma-last-clicker.vercel.app. Connect a wallet with a little testnet MON and click. Every click is a real transaction that confirms in about a second and costs a fraction of a cent, which is the only reason a game made of last-second clicks can live entirely on-chain.
 
-It's live on Monad testnet at https://gemma-last-clicker.vercel.app. You'll need a wallet and a little testnet MON. Every click is a real transaction that confirms in about a second and costs a fraction of a cent, which is the only reason a game made of last-second clicks can live entirely on-chain.
+## So how usable is it?
 
-So, can a free model on your laptop build a real dapp? Closer than I expected. It produced a safe contract and a clean interface, and it couldn't find one of its own bugs even with a sharper model feeding it the errors. It's a fast junior that can't read a stack trace yet. Good for learning and for things you'll throw away. For anything you would actually deploy, it needs someone sitting next to it.
+Treat a free local model as a fast junior. It is genuinely good at the parts it has seen a thousand times, standard contract logic and clean HTML, and it reached for the right security pattern without being asked. It saves you real time on the first draft. It comes apart the moment it touches a specific library's real API or has to read a stack trace, and across this whole build it found zero of its own bugs. Every error was caught by the compiler or by me.
+
+So a 12B gets you a working first draft of a contract and a good-looking shell of a frontend, and then you do the debugging and the integration by hand. For learning and for things you'll throw away, that's plenty. For anything you would deploy and walk away from, it needs someone next to it who can read the errors it can't.
 
 The repo has the code and every prompt I used: https://github.com/portdeveloper/gemma-last-clicker. The file that finally got it deploying to Monad cleanly is `MONAD_CONTEXT.md` in there. Go build something.
