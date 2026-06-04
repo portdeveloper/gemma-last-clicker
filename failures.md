@@ -35,12 +35,16 @@ transfer reverts.
   This is the sharpest finding: it fixed surface compile errors instantly but couldn't
   diagnose a runtime revert it could see in the output.
 
-## Human fix (test PASS)
-One real fix: fund the accounts (`vm.deal`), use `makeAddr` instead of precompile addresses,
-and warp once in the timer test so the reset deadline is strictly later. Result:
-`3 passed; 0 failed`. The contract itself needed no changes, which confirms it was correct.
+## Pushing it past the wall (test PASS, all Gemma's code)
+It found none of the three test bugs on its own. So each cause was diagnosed for it and named:
+1. Told it the accounts were unfunded (use `vm.deal`) -> it applied that. 1/3 passing.
+2. Told it the timer assertion needed a `vm.warp`, and that `address(1)/(2)` are precompiles
+   that can't receive ETH so it should use `makeAddr` -> it applied both. 3/3 passing.
+Every line of the passing tests is Gemma's. Every diagnosis was the operator's. It applies a
+fix you hand it; it does not locate one. The contract needed no changes, so it was correct all along.
 
 ## Net
-Gemma wrote a safe, correct contract and could clear compile errors in one round, but stalled
-completely on a subtle test runtime bug. The build is real and tested; the failure that
-mattered was one a human cleared in a minute.
+Gemma wrote a safe, correct contract and, shown a compiler error, cleared every compile error in
+one round. But it found zero of its three runtime test bugs on its own, even with the failing
+output in front of it, and fixed each only after the exact cause was dictated. The code is the
+model's; the debugging was entirely the operator's.
