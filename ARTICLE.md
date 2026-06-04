@@ -1,7 +1,7 @@
 ---
-title: "a free local model wrote my whole dapp. it couldn't fix one of its own bugs"
+title: "I asked Gemma 4 12B to create a dapp. Make no mistakes."
 description: "I had Claude drive a free local Gemma 4 12B to build a dapp on Monad. It wrote every line, dodged the famous reentrancy bug, and still couldn't find one of its own bugs without a smarter model feeding it each fix."
-slug: "free-local-model-wrote-my-dapp"
+slug: "i-asked-gemma-4-12b-to-create-a-dapp"
 published_at: "2026-06-05T12:00:00Z"
 modified_at: "2026-06-05T12:00:00Z"
 date_display: "June 5, 2026"
@@ -17,7 +17,7 @@ keywords:
   - dapp
   - foundry
 cover:
-  src: "assets/articles/free-local-model-wrote-my-dapp/cover.svg"
+  src: "assets/articles/i-asked-gemma-4-12b-to-create-a-dapp/cover.svg"
   alt: "A free local model building a dapp on Monad"
   og_alt: "free local model wrote my dapp"
 originally_published:
