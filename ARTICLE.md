@@ -1,6 +1,6 @@
 ---
 title: "I asked Gemma 4 12B to create a dapp. Make no mistakes."
-description: "I had Claude drive a free local Gemma 4 12B to build a dapp on Monad. It wrote every line, dodged the famous reentrancy bug, and still couldn't find one of its own bugs without a smarter model feeding it each fix."
+description: "I had a free local Gemma 4 12B build a dapp on Monad. It wrote every line and dodged the famous reentrancy bug, then couldn't fix a single one of its own bugs without me diagnosing each one."
 slug: "i-asked-gemma-4-12b-to-create-a-dapp"
 published_at: "2026-06-05T12:00:00Z"
 modified_at: "2026-06-05T12:00:00Z"
@@ -25,46 +25,48 @@ originally_published:
   url: "https://x.com/port_dev"
 ---
 
-![A free local model building a dapp on Monad](assets/articles/free-local-model-wrote-my-dapp/cover.svg "the whole thing was written by a 12B running on a laptop")
+![A free local model building a dapp on Monad](assets/articles/i-asked-gemma-4-12b-to-create-a-dapp/cover.svg "the whole thing was written by a 12B running on a laptop")
 
-A free model that fits on a laptop wrote my entire dapp, the contract and the frontend, and then could not find a single one of its own bugs.
+A free model that fits on a laptop wrote my entire dapp, contract and frontend, and then couldn't find a single one of its own bugs.
 
-I work at Monad, so the question I wanted answered was simple: can a free, open model you run yourself build something real for an EVM chain? I set up an experiment to find out. I had Claude operate a local Gemma 4 12B, Claude wrote the prompts, ran the compiler, and fed back the errors, while Gemma wrote every line of code. I gave it a game to build and never told it which chain it would deploy to. Then I watched.
+I work at Monad, and I had a question in mind: can a free, open model you run on your own machine actually build something real for an EVM chain? So I set it up as a test. A local Gemma 4 12B wrote the code, and Claude operated it, sending the prompts and pasting back whatever the compiler complained about. I gave it a game to build.
 
 ## The setup
 
-Gemma 4 12B shipped on June 3rd under Apache 2.0, so you can run it, fine-tune it, and ship it with no strings. It fits in about 16GB. I ran it locally with llama.cpp on Metal, no API key, nothing leaving the machine, around 20 to 40 tokens a second. The game is last-clicker: a pot, a short timer, every click is a transaction, and whoever clicks last before the clock runs out takes the pot. The whole build ran against Anvil, the local node, so for the entire build there was no chain to know about.
+Gemma 4 12B shipped on June 3rd, and the license is now Apache 2.0, so you can do what you like with it. It fits in about 16GB, which meant I could run it on my own machine with llama.cpp, no API key and nothing leaving the laptop. It managed 20 to 40 tokens a second.
+
+The game is last-clicker. You pay a tiny fee to click, and each click resets a short countdown. Whoever clicked last when the timer runs out takes the pot. I built it against Anvil, Foundry's local node.
 
 ## What it got right
 
-The game logic was correct on the first try. And the part I expected it to fail, it nailed: the payout zeroes the pot before it sends and uses `.transfer()`, which is checks-effects-interactions, the pattern that stops a reentrancy drain. I had money on it writing the naive version, the exact bug that emptied the DAO in 2016 and split Ethereum in two. It didn't. A free 12B quietly avoided the most famous footgun in the language. Credit where it's due.
+The game logic was right on the first try. More surprising was the security. Its payout zeroes the pot before sending the money and uses `.transfer()`, the ordering that stops a reentrancy attack, where the recipient calls back in and drains the contract before the balance updates. That is the bug behind the 2016 DAO hack, and I assumed a 12B would reach for the naive version, but it wrote the safe one.
 
 ## Where it broke
 
-It couldn't hand over a project that compiled. The first version imported Hardhat into a Foundry test, declared two constructors, used a modifier that was secretly a function, and called a `deploy()` helper that doesn't exist. So I pasted back the first compiler error, just the Hardhat one, and it fixed all of it in a single round. That part genuinely impressed me.
+The first version didn't compile, and the reasons were a tour of how a model fakes fluency. The one that made me laugh: it imported Hardhat into a Foundry project. A couple more were in the same spirit, a constructor declared twice among them. I pasted back only the first error, and it cleared the whole set in one round, which I hadn't expected.
 
-Then it hit a wall and stayed there. The tests compiled but every one reverted on the first click, because the test never funded the player accounts. I fed it the failure. It added `vm.warp`, then `vm.roll`, chasing a timing theory, and the tests failed identically, same gas to the digit, three rounds running. It could not see the bug, even with the revert sitting in its own output.
+Then it got stuck and stayed there. The tests compiled, but every one reverted on the first click, because the test never gave the player accounts any ether to spend. I handed it the failure. It tried `vm.warp`, then `vm.roll`, convinced the problem was timing, and three rounds later the tests were failing the same way, down to the gas. The revert was sitting in its own output and it could not see the cause.
 
-So I stopped waiting and diagnosed it. I told it the accounts were unfunded and to use `vm.deal`. It applied that, and one of three tests passed. It still missed the other two, a timer assertion that never advanced the clock and a pair of precompile addresses that can't receive ether. Only when I named each of those precisely did it fix them, and the suite went green. Every line of the passing tests is Gemma's. Every diagnosis was the operator's. **It applies a fix you hand it. It cannot locate one.**
+So I diagnosed it. I told it the accounts were unfunded and to use `vm.deal`, and that got one of three tests green. It still missed the other two, a timer check that never moved the clock forward and a pair of precompile addresses that can't receive ether, and each passed only once I named the exact cause. Every line of the passing tests is the model's; every diagnosis was mine. **It can apply a fix you hand it, but it can't find one on its own.**
 
-The frontend said the same thing louder. I asked for a single page with viem, and it produced a sharp-looking UI, glass cards and a live countdown. The web3 layer underneath was invented: imports that aren't in viem, a contract object with methods that don't exist, the wrong wallet call. That's the failure mode of a small model on a specific library, it knows the shape and makes up the details. I rewrote the wiring by hand. The look was its work. The plumbing was mine.
+The frontend went the same way. I asked for a single page with viem and got a genuinely sharp-looking UI. The web3 layer beneath it was invented, imports that aren't in viem and methods that don't exist on objects it made up. It knows what working code should look like and fills the specifics in with fiction, so I rewrote the wiring myself. The interface was its work, the plumbing was mine.
 
 ## The reveal: it was Monad, and it took one line
 
-I never told the model what chain this was for, because there was nothing to tell. Anvil is just the EVM, and everything it wrote was plain EVM code. When the contract and tests were green, I pointed Foundry at one URL:
+I never told the model what chain this was for, because there was nothing to tell it. Anvil is just the EVM, and every line it wrote was ordinary EVM code. Once the contract and tests were green, I pointed Foundry at one URL:
 
 ```bash
 forge create src/LastClicker.sol:LastClicker --rpc-url https://testnet-rpc.monad.xyz --broadcast
 ```
 
-Foundry read the chain id off the endpoint by itself. It deployed first try, and verifying the source on Monad's explorer was one more API call that came back a perfect match. The chain was Monad, and the model never knew, because it never needed to: Monad runs EVM bytecode, so the Solidity it already knew was already correct. The only Monad-specific fact in the whole build was a single RPC URL. Even the testnet MON came from an agent faucet over an API call.
+Foundry read the chain id off the endpoint on its own, and the deploy went through on the first try. Verifying the source on Monad's explorer was one more API call that came back a perfect match. The chain was Monad, and the model never needed to know it, because Monad runs EVM bytecode and the Solidity it already knew was correct. The only Monad-specific detail in the whole build was that one RPC URL, and even the testnet MON for gas came from an agent faucet over an API call.
 
-One honest asterisk: forge's linter flagged the timer for leaning on `block.timestamp`, which validators can nudge. That bites harder on a one-second chain than a twelve-second one, and it's the kind of thing you'd tighten before mainnet.
+One honest caveat: forge's linter flagged the timer for leaning on `block.timestamp`, which validators can nudge. That matters more on a one-second chain than a twelve-second one, and you would tighten it before mainnet.
 
 ## Play it
 
-It's live on Monad testnet: https://gemma-last-clicker.vercel.app. Connect a wallet, grab testnet MON, and click. Every click is a real transaction confirmed in about a second for a fraction of a cent, which is the only reason a last-second game like this works on-chain at all.
+It's live on Monad testnet at https://gemma-last-clicker.vercel.app. You'll need a wallet and a little testnet MON. Every click is a real transaction that confirms in about a second and costs a fraction of a cent, which is the only reason a game made of last-second clicks can live entirely on-chain.
 
-So, can a free model on your laptop build a real dapp? Closer than I expected, and not on its own. It wrote a safe contract and a clean interface, and it could not find one of its own bugs even with a smarter model feeding it the errors. It's a fast junior with no debugger. Good enough today for throwaways and for learning. For anything you'd actually deploy, it still needs someone next to it who can read a stack trace.
+So, can a free model on your laptop build a real dapp? Closer than I expected, and not by itself. It produced a safe contract and a clean interface, and it couldn't find one of its own bugs even with a sharper model feeding it the errors. It's a fast junior that can't read a stack trace yet. Good for learning and for things you'll throw away. For anything you would actually deploy, it needs someone sitting next to it.
 
-The repo, every prompt, and the full build log are here: https://github.com/portdeveloper/gemma-last-clicker. The one file that taught the model to deploy to Monad correctly is `MONAD_CONTEXT.md` in that repo. Go build something.
+The repo has the code and every prompt I used: https://github.com/portdeveloper/gemma-last-clicker. The file that finally got it deploying to Monad cleanly is `MONAD_CONTEXT.md` in there. Go build something.
