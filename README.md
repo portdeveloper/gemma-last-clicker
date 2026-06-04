@@ -9,6 +9,7 @@ see `ARTICLE.md`, `failures.md`, and `build-log/`.
 
 - **Live demo:** https://gemma-last-clicker.vercel.app
 - **Contract** (Monad testnet, chain 10143): `0x0507d7290992B475ED3FC83AF9d54aa8A29D4005`
+  (verified: [monadscan](https://testnet.monadscan.com/address/0x0507d7290992B475ED3FC83AF9d54aa8A29D4005) · [monadvision](https://testnet.monadvision.com/address/0x0507d7290992B475ED3FC83AF9d54aa8A29D4005))
 - **Frontend:** `frontend/index.html` (Gemma wrote the UI; the viem layer was hallucinated and rewritten by hand)
 
 ## contracts (Foundry)

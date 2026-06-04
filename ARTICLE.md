@@ -73,14 +73,14 @@ I never told the model what chain this was for, because there was nothing to tel
 forge create src/LastClicker.sol:LastClicker --rpc-url https://testnet-rpc.monad.xyz --broadcast
 ```
 
-Foundry read the chain id off the endpoint by itself. It deployed first try. The chain was Monad, and the model never knew, because it never needed to: Monad runs EVM bytecode, so the Solidity it already knew was already correct. The only Monad-specific fact in the whole build was a single RPC URL. Even the testnet MON came from an agent faucet over an API call, so no human funded it either.
+Foundry read the chain id off the endpoint by itself. It deployed first try, and verifying the source on Monad's explorer was one more API call that came back a perfect match. The chain was Monad, and the model never knew, because it never needed to: Monad runs EVM bytecode, so the Solidity it already knew was already correct. The only Monad-specific fact in the whole build was a single RPC URL. Even the testnet MON came from an agent faucet over an API call, so no human funded it either.
 
 One honest asterisk forge's linter flagged: the timer leans on `block.timestamp`, which validators can nudge. That matters more on a chain with one-second blocks than on one with twelve, and it's the kind of thing you'd tighten before mainnet.
 
 ## Play it
 
-It's live on Monad testnet: [TK: https://gemma-last-clicker.vercel.app]. Connect a wallet, grab testnet MON, and click. Every click is a real transaction confirmed in about a second for a fraction of a cent, which is the only reason a last-second game like this works on-chain at all. [TK: drop the clip of rapid clicks here.]
+It's live on Monad testnet: https://gemma-last-clicker.vercel.app. Connect a wallet, grab testnet MON, and click. Every click is a real transaction confirmed in about a second for a fraction of a cent, which is the only reason a last-second game like this works on-chain at all. [TK: drop the clip of rapid clicks here.]
 
 So, can a free model on your laptop build a real dapp? [TK: your honest verdict. Mine, as a draft: it gets you a safe, working contract and a pretty frontend, and then a human spends an hour fixing the tests and the wiring it couldn't. That's further than I expected, and not yet far enough to leave alone.]
 
-The repo, every prompt, and the full build log are here: [TK: repo link]. The one file that taught any model to deploy to Monad correctly is [TK: MONAD_CONTEXT.md link]. Go build something.
+The repo, every prompt, and the full build log are here: https://github.com/portdeveloper/gemma-last-clicker. The one file that taught any model to deploy to Monad correctly is `MONAD_CONTEXT.md` in that repo. Go build something.
